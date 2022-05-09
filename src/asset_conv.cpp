@@ -2,6 +2,7 @@
 
 #include "nanosvg/nanosvg.h"
 #include "nanosvg/nanosvgrast.h"
+#include <condition_variable>
 
 #include <memory>
 #include <iostream>
@@ -9,6 +10,7 @@
 #include <vector>
 #include <queue>
 #include <unordered_map>
+#include <filesystem>
 #include <string>
 #include <cstring>
 #include <thread>
@@ -17,7 +19,7 @@ namespace gif643 {
 
 const size_t    BPP         = 4;    // Bytes per pixel
 const float     ORG_WIDTH   = 48.0; // Original SVG image width in px.
-const int       NUM_THREADS = 1;    // Default value, changed by argv. 
+const int       NUM_THREADS = 8;    // Default value, changed by argv. 
 
 using PNGDataVec = std::vector<char>;
 using PNGDataPtr = std::shared_ptr<PNGDataVec>;
@@ -110,16 +112,53 @@ struct TaskDef
 ///
 class TaskRunner
 {
-private:
+protected:
     TaskDef task_def_;
 
 public:
-    TaskRunner(const TaskDef& task_def):
-        task_def_(task_def)
+    TaskRunner(const TaskDef& task_def)
     {
+        task_def_ = task_def;
     }
 
-    void operator()()
+    virtual void run() = 0;
+};
+
+class CopyExistingFileTaskRunner : public TaskRunner
+{
+public:
+    CopyExistingFileTaskRunner(const TaskDef& task_def) : TaskRunner(task_def) { }
+
+    virtual void run()
+    {
+        if (task_def_.fname_in.compare(task_def_.fname_out) == 0)
+        {
+            std::cerr << "[Cache] Hit for "
+                    << task_def_.fname_in
+                    << " Output path is already in cache, nothing changed"
+                    << std::endl;
+        }
+        else
+        {
+            std::cerr << "[Cache] Hit for "
+                    << task_def_.fname_in
+                    << " Copying from cache to "
+                    << task_def_.fname_out
+                    << std::endl;
+            std::filesystem::copy_file(
+                    task_def_.fname_in,
+                    task_def_.fname_out,
+                    std::filesystem::copy_options::overwrite_existing);
+        }
+    }
+};
+
+class RasterizerTaskRunner : public TaskRunner
+{
+public:
+    RasterizerTaskRunner(const TaskDef& task_def) : TaskRunner(task_def) { }
+
+    virtual void run()
     {
         const std::string&  fname_in    = task_def_.fname_in;
         const std::string&  fname_out   = task_def_.fname_out;
@@ -129,7 +168,7 @@ public:
         const size_t        image_size  = height * stride;
         const float&        scale       = float(width) / ORG_WIDTH;
 
-        std::cerr << "Running for "
+        std::cerr << "[Rasterizer] Running for "
                   << fname_in 
                   << "..." 
                   << std::endl;
@@ -141,7 +180,7 @@ public:
             // Read the file ...
             image_in = nsvgParseFromFile(fname_in.c_str(), "px", 0);
             if (image_in == nullptr) {
-                std::string msg = "Cannot parse '" + fname_in + "'.";
+                std::string msg = "[Rasterizer] Cannot parse '" + fname_in + "'.";
                 throw std::runtime_error(msg.c_str());
             }
 
@@ -168,7 +207,7 @@ public:
             file_out.write(&(data->front()), data->size());
             
         } catch (std::runtime_error e) {
-            std::cerr << "Exception while processing "
+            std::cerr << "[Rasterizer] Exception while processing "
                       << fname_in
                       << ": "
                       << e.what()
@@ -180,10 +219,55 @@ public:
         nsvgDeleteRasterizer(rast);
 
         std::cerr << std::endl 
-                  << "Done for "
+                  << "[Rasterizer] Done for "
                   << fname_in 
                   << "." 
                   << std::endl;
+    }
+};
+
+// https://stackoverflow.com/a/4793662
+class Semaphore
+{
+private:
+    std::mutex mutex_;
+    std::condition_variable condition_;
+    int count_;
+
+public:
+    Semaphore(int count = 0)
+    {
+        count_ = count;
+    }
+
+    void release()
+    {
+        mutex_.lock();
+        --count_;
+        mutex_.unlock();
+        // Should be outside the lock
+        condition_.notify_one();
+    }
+
+    /// \brief Tells the semaphore that it will receive an 'acquire' call in the future.
+    void request()
+    {
+        std::lock_guard<decltype(mutex_)> lock(mutex_);
+        ++count_;
+    }
+
+    void acquire(bool requested = false)
+    {
+        std::unique_lock<decltype(mutex_)> lock(mutex_);
+        while(!count_) // Handle spurious wake-ups.
+            condition_.wait(lock);
+        if (!requested) ++count_;
+    }
+
+    int count()
+    {
+        std::lock_guard<decltype(mutex_)> lock(mutex_);
+        return count_;
     }
 };
 
@@ -205,17 +289,24 @@ public:
 class Processor
 {
 private:
+    std::condition_variable new_task_cond_;
+    std::mutex queue_mutex_;
     // The tasks to run queue (FIFO).
     std::queue<TaskDef> task_queue_;
 
+    // Files currently handled by threads.
+    std::unordered_map<std::string, Semaphore*> files_in_handling_;
+    std::mutex files_in_handling_mutex_;
+
     // The cache hash map (TODO). Note that we use the string definition as the // key.
-    using PNGHashMap = std::unordered_map<std::string, PNGDataPtr>;
-    PNGHashMap png_cache_;
+    std::unordered_map<std::string, std::string> cache_;
 
     bool should_run_;           // Used to signal the end of the processor to
                                 // threads.
 
     std::vector<std::thread> queue_threads_;
+    
+
 
 public:
     /// \brief Default constructor.
@@ -241,11 +332,13 @@ public:
                 std::thread(&Processor::processQueue, this)
             );
         }
+        files_in_handling_.reserve(n_threads);
     }
 
     ~Processor()
     {
         should_run_ = false;
+        new_task_cond_.notify_all();
         for (auto& qthread: queue_threads_) {
             qthread.join();
         }
@@ -296,8 +389,9 @@ public:
     {
         TaskDef def;
         if (parse(line_org, def)) {
-            TaskRunner runner(def);
-            runner();
+            TaskRunner* runner = getTaskRunner(def);
+            runner->run();
+            delete runner;
         }
     }
 
@@ -307,11 +401,15 @@ public:
     /// nothing is queued.
     void parseAndQueue(const std::string& line_org)
     {
-        std::queue<TaskDef> queue;
         TaskDef def;
         if (parse(line_org, def)) {
             std::cerr << "Queueing task '" << line_org << "'." << std::endl;
+
+            queue_mutex_.lock();
             task_queue_.push(def);
+            queue_mutex_.unlock();
+            
+            new_task_cond_.notify_one();
         }
     }
 
@@ -322,18 +420,97 @@ public:
     }
 
 private:
+
+    TaskRunner* getTaskRunner(TaskDef task_def)
+    {
+        // Try to add the file name to the cache.
+        auto cache_result = cache_.emplace(task_def.fname_in, task_def.fname_out);
+        if (cache_result.second)
+        {
+            return new RasterizerTaskRunner(task_def);
+        }
+        else //Image is in cache.
+        {
+            TaskDef copy_task_def;
+            copy_task_def.fname_in = cache_result.first->second;
+            copy_task_def.fname_out = task_def.fname_out;
+            copy_task_def.size = task_def.size;
+
+            return new CopyExistingFileTaskRunner(copy_task_def);
+        }
+    }
+
+    /// \brief Gets the semaphore for the given filename.
+    /// Ensures a single process can work on a given file at a time.
+    Semaphore* getOrCreateFileSemaphore(std::string filename)
+    {
+        std::lock_guard<std::mutex> lk(files_in_handling_mutex_);
+        Semaphore* file_semaphore = new Semaphore(1);
+        auto insert_result = files_in_handling_.emplace(filename, file_semaphore);
+        
+        // Mutex already exists, use that one.
+        if (!insert_result.second)
+        {
+            delete file_semaphore;
+            file_semaphore = insert_result.first->second;
+        }
+
+        // Tell the semaphore that another thread will need it soon.
+        file_semaphore->request();
+        return file_semaphore;
+    }
+
     /// \brief Queue processing thread function.
     void processQueue()
     {
         while (should_run_) {
-            if (!task_queue_.empty()) {
-                TaskDef task_def = task_queue_.front();
-                task_queue_.pop();
-                TaskRunner runner(task_def);
-                runner();
+            std::unique_lock<std::mutex> lk(queue_mutex_);
+            new_task_cond_.wait(lk,
+            [this]{
+                /* Threads can be stuck here with an empty queue while we wait for join.
+                So we check if a thread join is requested by evaluating 'should_run_'. */
+                return !task_queue_.empty() || !should_run_;
+            });
+
+            // Thread join requested.
+            if (!should_run_)
+            {
+                lk.unlock();
+                break;
+            }
+
+            TaskDef task_def = task_queue_.front();
+            // The following line needs the lock to safely access the cache.
+            TaskRunner* runner = getTaskRunner(task_def);
+            task_queue_.pop();
+            lk.unlock();
+
+            Semaphore* file_semaphore = getOrCreateFileSemaphore(task_def.fname_in);
+
+            // A-1) Wait here if another thread is using the file
+            file_semaphore->acquire(true);
+
+            runner->run();
+            delete runner;
+            
+            std::lock_guard<std::mutex> fih_lk(files_in_handling_mutex_);
+            // Checks if other threads need the semaphore
+            if (file_semaphore->count())
+            {
+                // A-2) Let another thread take the file (see A-1)
+                file_semaphore->release();
+            }
+            else
+            {
+                files_in_handling_.erase(task_def.fname_in);
+                delete file_semaphore;
             }
         }
     }
+};
+
+}
+
 };
 
 }
@@ -364,7 +541,7 @@ int main(int argc, char** argv)
     
     while (!std::cin.eof()) {
 
-        std::string line, line_org;
+        std::string line;
 
         std::getline(std::cin, line);
         if (!line.empty()) {
@@ -377,5 +554,7 @@ int main(int argc, char** argv)
     }
 
     // Wait until the processor queue's has tasks to do.
-    while (!proc.queueEmpty()) {};
+    while (!proc.queueEmpty()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    };
 }

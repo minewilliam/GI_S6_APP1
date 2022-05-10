@@ -30,11 +30,12 @@ def curl_H(H):
 
 
 def timestep(E, H, courant_number, source_pos, source_val):
-    E += courant_number * curl_H(H) 
+    print("curl ", curl_H(H)[n//3][n//3][n//2][0])
+
+    E += courant_number * curl_H(H)
     E[source_pos] += source_val
     H -= courant_number * curl_E(E)
-    ##print(E[30][30][30][0])
-    print(E[n//3][n//3][n//2][0])
+    print("-----")
     return E, H
 
 
@@ -60,8 +61,6 @@ class WaveEquation:
         elif slice == 2:
             field = field[:, :, slice_index, field_component]
         source_pos, source_index = source(self.index)
-        ##print (self.index, source_index)
-        print(self.index)
         self.E, self.H = timestep(self.E, self.H, self.courant_number, source_pos, source_index)
 
         if initial:

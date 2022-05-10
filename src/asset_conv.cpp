@@ -10,6 +10,7 @@
 #include <vector>
 #include <queue>
 #include <unordered_map>
+#include <algorithm>
 #include <filesystem>
 #include <string>
 #include <cstring>
@@ -511,8 +512,21 @@ private:
 
 }
 
-};
+// https://stackoverflow.com/a/868894
+char* getCmdOption(char ** begin, char ** end, const std::string & option)
+{
+    char ** itr = std::find(begin, end, option);
+    if (itr != end && ++itr != end)
+    {
+        return *itr;
+    }
+    return 0;
+}
 
+// https://stackoverflow.com/a/868894
+bool cmdOptionExists(char** begin, char** end, const std::string& option)
+{
+    return std::find(begin, end, option) != end;
 }
 
 int main(int argc, char** argv)
@@ -532,12 +546,21 @@ int main(int argc, char** argv)
                         << "', using stdin (press CTRL-D for EOF)." 
                         << std::endl;
         }
-    } else {
+    }
+    else {
         std::cerr << "Using stdin (press CTRL-D for EOF)." << std::endl;
     }
 
+    int threads = NUM_THREADS;
+    char* nbthreads = getCmdOption(argv, argv + argc, "-t");
+    if(nbthreads)
+    {
+        threads = atoi(nbthreads);
+        std::cerr << "Using " << nbthreads << " threads." << std::endl;
+    }
+
     // TODO: change the number of threads from args.
-    Processor proc;
+    Processor proc(threads);
     
     while (!std::cin.eof()) {
 

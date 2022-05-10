@@ -1,0 +1,124 @@
+#include <iostream>
+#include <vector>
+#include <mutex>
+#include <thread>
+
+const float n = 3;
+
+namespace {
+    std::mutex mutex;
+    std::vector<std::vector<std::vector<float>>> k_x = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
+    std::vector<std::vector<std::vector<float>>> k_y = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
+    std::vector<std::vector<std::vector<float>>> k_z = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
+
+}
+
+
+std::vector<std::vector<std::vector<float>>> set3DVectorToZero(std::vector<std::vector<std::vector<float>>> vector)
+{
+    for(int x = 0; x < n; x++)
+    {
+        for(int y = 0; y < n; y++)
+        {
+            for(int z = 0; z < n; z++)
+            {
+                vector[x][y][z] = 0;
+            }   
+        }
+    }
+
+    return vector;
+}
+
+//premiere fonction
+std::vector<std::vector<std::vector<float>>> first_function(
+    std::vector<std::vector<std::vector<float>>> gauche, 
+    std::vector<std::vector<std::vector<float>>> droit)
+{
+    std::vector<std::vector<std::vector<float>>> retour;
+    retour = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
+
+    for(int x = 0; x < n; x++)
+    {
+        for(int y = 0; y < n-1; y++)
+        {
+            for(int z = 0; z < n; z++)
+            {
+                retour[x][y][z] += gauche[x][y+1][z] - droit[x][y][z];
+            }
+        }
+    }
+    return retour;
+}
+
+
+void differential_partiel_x(std::vector<std::vector<std::vector<float>>> f)
+{
+    std::unique_lock<std::mutex> lock(mutex);
+    for(int x = 0; x < n-1; x++)
+    {
+        for(int y = 0; y < n; y++)
+        {
+            for(int z = 0; z < n; z++)
+            {
+                k_x[x][y][z] = f[x][y][z] - f[x+1][y][z];
+            }
+        }
+    }
+    lock.unlock();
+}
+
+void differential_partiel_y(std::vector<std::vector<std::vector<float>>> f)
+{
+    std::unique_lock<std::mutex> lock(mutex);
+    for(int x = 0; x < n; x++)
+    {
+        for(int y = 0; y < n-1; y++)
+        {
+            for(int z = 0; z < n; z++)
+            {
+                k_y[x][y][z] = f[x][y][z] - f[x][y+1][z];
+            }
+        }
+    }
+    lock.unlock();
+}
+
+
+void differential_partiel_z(std::vector<std::vector<std::vector<float>>> f)
+{
+    std::unique_lock<std::mutex> lock(mutex);
+    for(int x = 0; x < n; x++)
+    {
+        for(int y = 0; y < n; y++)
+        {
+            for(int z = 0; z < n-1; z++)
+            {
+                k_z[x][y][z] = f[x][y][z] - f[x][y][z+1];
+            }
+        }
+    }
+    lock.unlock();
+}
+
+
+
+int main()
+{
+    std::vector<std::vector<std::vector<float>>> f1;
+    f1 = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
+    std::vector<std::vector<std::vector<float>>> f2;
+    f2 = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
+    std::vector<std::vector<std::vector<float>>> f3;
+    f3 = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
+
+    //premiere ligne
+    std::thread t1(differential_partiel_y, f3);
+    std::thread t2(differential_partiel_z, f2);
+
+    t1.join();
+
+    std::cout << temp[0][0][0] << std::endl;
+
+    return 0;
+}

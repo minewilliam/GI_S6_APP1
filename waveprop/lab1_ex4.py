@@ -39,7 +39,7 @@ q1      = data1D[:]
 q1_rep  = data1D
 
 # Q2 - Les trois premiers éléments du vecteur 1D
-q2      = data1D[:]
+q2      = data1D[0:3]
 q2_rep  = np.array([1,2,3])
 
 # Q3 - Les deux derniers éléments du vecteur 1D

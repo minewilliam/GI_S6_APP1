@@ -12,6 +12,7 @@ def curl_E(E):
 
     curl_E[:-1, :, :, 2] += E[1:, :, :, 1] - E[:-1, :, :, 1]
     curl_E[:, :-1, :, 2] -= E[:, 1:, :, 0] - E[:, :-1, :, 0]
+    ##print(curl_E[30][30][30][0])
     return curl_E
 
 def curl_H(H):
@@ -29,9 +30,11 @@ def curl_H(H):
 
 
 def timestep(E, H, courant_number, source_pos, source_val):
-    E += courant_number * curl_H(H)
+    E += courant_number * curl_H(H) 
     E[source_pos] += source_val
     H -= courant_number * curl_E(E)
+    ##print(E[30][30][30][0])
+    print(E[n//3][n//3][n//2][0])
     return E, H
 
 
@@ -57,6 +60,8 @@ class WaveEquation:
         elif slice == 2:
             field = field[:, :, slice_index, field_component]
         source_pos, source_index = source(self.index)
+        ##print (self.index, source_index)
+        print(self.index)
         self.E, self.H = timestep(self.E, self.H, self.courant_number, source_pos, source_index)
 
         if initial:
@@ -78,6 +83,7 @@ if __name__ == "__main__":
 
 
     w = WaveEquation((n, n, n), 0.1, source)
+
     fiddle.fiddle(w, [('field component',{'Ex':0,'Ey':1,'Ez':2, 'Hx':3,'Hy':4,'Hz':5}),('slice',{'XY':2,'YZ':0,'XZ':1}),('slice index',0,n-1,n//2,1)], update_interval=0.01)
 
 

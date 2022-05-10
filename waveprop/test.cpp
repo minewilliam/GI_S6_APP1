@@ -15,13 +15,24 @@ std::vector<float> modification2(std::vector<float> h)
 
     return h;
 }
+
+float source(int index)
+{
+    return 0.1*sin(0.1*index);
+}
+
 int main()
 {
-    std::vector<float> h(10, 0);
-    std::vector<float> retour(10, 0);
+    float puissance = 0;
+    int index = 0;
 
-
-    std::cout << sin(3.14/2) << std::endl;
+    while(true)
+    {
+        puissance += source(index);
+        puissance = 0.1 * puissance;
+        index++;
+        std::cout << puissance << std::endl;
+    }
     
     return 0;
 }

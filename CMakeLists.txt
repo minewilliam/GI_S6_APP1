@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.1)
 
 project(AssetConv VERSION 0.1 LANGUAGES C CXX)
 
-set(CMAKE_CXX_STANDARD          11)
+set(CMAKE_CXX_STANDARD          17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS        OFF)
 
@@ -15,17 +15,10 @@ add_executable(asset_conv src/asset_conv.cpp)
 target_link_libraries(asset_conv nanosvg stb_image pthread)
 
 # Lab
-add_executable(lab_ex1 src/lab_ex1.cpp)
-add_executable(lab_ex2 src/lab_ex2.cpp)
-add_executable(lab_ex3 src/lab_ex3.cpp)
 add_executable(lab_ex4 waveprop/lab1_ex4.cpp)
 
 add_executable(ftdt_yee waveprop/ftdt_yee.cpp)
 add_executable(test waveprop/test.cpp)
-
-target_link_libraries(lab_ex1 pthread)
-target_link_libraries(lab_ex2 pthread)
-target_link_libraries(lab_ex3 pthread)
 
 target_link_libraries(ftdt_yee pthread)
 target_link_libraries(test pthread)

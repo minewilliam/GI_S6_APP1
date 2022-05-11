@@ -6,7 +6,7 @@
 #include <future>
 
 const int n = 100;
-const float courant = 0.1;
+const double courant = 0.1;
 
 namespace {
     std::mutex mutex;
@@ -14,16 +14,16 @@ namespace {
 }
 
 //source strenght through time
-float power_source(int index)
+double power_source(int index)
 {
     return 0.1*sin(0.1*index);
 }
 
 //wave propagation in all matrice
 //H -= courant_number * curl_E(E)
-std::vector<std::vector<std::vector<float>>> propagation_H(
-    std::vector<std::vector<std::vector<float>>> curl_E, 
-    std::vector<std::vector<std::vector<float>>> H)
+std::vector<std::vector<std::vector<double>>> propagation_H(
+    std::vector<std::vector<std::vector<double>>> curl_E, 
+    std::vector<std::vector<std::vector<double>>> H)
 {
     std::unique_lock<std::mutex> lock(mutex);
     for(int x = 0; x < n; x++)
@@ -42,9 +42,9 @@ std::vector<std::vector<std::vector<float>>> propagation_H(
 }
 
 //E += courant_number * curl_H(H) 
-std::vector<std::vector<std::vector<float>>> propagation_E(
-    std::vector<std::vector<std::vector<float>>> curl_H,
-    std::vector<std::vector<std::vector<float>>> E)
+std::vector<std::vector<std::vector<double>>> propagation_E(
+    std::vector<std::vector<std::vector<double>>> curl_H,
+    std::vector<std::vector<std::vector<double>>> E)
 {
     std::unique_lock<std::mutex> lock(mutex);
     for(int x = 0; x < n; x++)
@@ -63,11 +63,11 @@ std::vector<std::vector<std::vector<float>>> propagation_E(
 }
 
 //f1 & f2
-std::vector<std::vector<std::vector<float>>> curl_f0( 
-    std::vector<std::vector<std::vector<float>>> f1, 
-    std::vector<std::vector<std::vector<float>>> f2)
+std::vector<std::vector<std::vector<double>>> curl_f0( 
+    std::vector<std::vector<std::vector<double>>> f1, 
+    std::vector<std::vector<std::vector<double>>> f2)
 {
-    std::vector<std::vector<std::vector<float>>> curl = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
+    std::vector<std::vector<std::vector<double>>> curl = std::vector<std::vector<std::vector<double>>>(100, std::vector<std::vector<double>>(100, std::vector<double>(100)));
     for(int x = 1; x < n-1; x++)
     {
         for(int y = 1; y < n-1; y++)
@@ -83,11 +83,11 @@ std::vector<std::vector<std::vector<float>>> curl_f0(
 }
 
 //f0 & f2
-std::vector<std::vector<std::vector<float>>> curl_f1(
-    std::vector<std::vector<std::vector<float>>> f0, 
-    std::vector<std::vector<std::vector<float>>> f2)
+std::vector<std::vector<std::vector<double>>> curl_f1(
+    std::vector<std::vector<std::vector<double>>> f0, 
+    std::vector<std::vector<std::vector<double>>> f2)
 {
-    std::vector<std::vector<std::vector<float>>> curl = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
+    std::vector<std::vector<std::vector<double>>> curl = std::vector<std::vector<std::vector<double>>>(100, std::vector<std::vector<double>>(100, std::vector<double>(100)));
     for(int x = 1; x < n-1; x++)
     {
         for(int y = 1; y < n-1; y++)
@@ -103,11 +103,11 @@ std::vector<std::vector<std::vector<float>>> curl_f1(
 }
 
 //f0 & f1
-std::vector<std::vector<std::vector<float>>> curl_f2(
-    std::vector<std::vector<std::vector<float>>> f0, 
-    std::vector<std::vector<std::vector<float>>> f1)
+std::vector<std::vector<std::vector<double>>> curl_f2(
+    std::vector<std::vector<std::vector<double>>> f0, 
+    std::vector<std::vector<std::vector<double>>> f1)
 {
-    std::vector<std::vector<std::vector<float>>> curl = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
+    std::vector<std::vector<std::vector<double>>> curl = std::vector<std::vector<std::vector<double>>>(100, std::vector<std::vector<double>>(100, std::vector<double>(100)));
     for(int x = 1; x < n-1; x++)
     {
         for(int y = 1; y < n-1; y++)
@@ -124,34 +124,34 @@ std::vector<std::vector<std::vector<float>>> curl_f2(
 int main()
 {
     //F
-    std::vector<std::vector<std::vector<float>>> f0_E;
-    f0_E = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
-    std::vector<std::vector<std::vector<float>>> f1_E;
-    f1_E = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
-    std::vector<std::vector<std::vector<float>>> f2_E;
-    f2_E = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
+    std::vector<std::vector<std::vector<double>>> f0_E;
+    f0_E = std::vector<std::vector<std::vector<double>>>(100, std::vector<std::vector<double>>(100, std::vector<double>(100)));
+    std::vector<std::vector<std::vector<double>>> f1_E;
+    f1_E = std::vector<std::vector<std::vector<double>>>(100, std::vector<std::vector<double>>(100, std::vector<double>(100)));
+    std::vector<std::vector<std::vector<double>>> f2_E;
+    f2_E = std::vector<std::vector<std::vector<double>>>(100, std::vector<std::vector<double>>(100, std::vector<double>(100)));
 
-    std::vector<std::vector<std::vector<float>>> f0_H;
-    f0_H = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
-    std::vector<std::vector<std::vector<float>>> f1_H;
-    f1_H = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
-    std::vector<std::vector<std::vector<float>>> f2_H;
-    f2_H = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
+    std::vector<std::vector<std::vector<double>>> f0_H;
+    f0_H = std::vector<std::vector<std::vector<double>>>(100, std::vector<std::vector<double>>(100, std::vector<double>(100)));
+    std::vector<std::vector<std::vector<double>>> f1_H;
+    f1_H = std::vector<std::vector<std::vector<double>>>(100, std::vector<std::vector<double>>(100, std::vector<double>(100)));
+    std::vector<std::vector<std::vector<double>>> f2_H;
+    f2_H = std::vector<std::vector<std::vector<double>>>(100, std::vector<std::vector<double>>(100, std::vector<double>(100)));
 
     //curl
-    std::vector<std::vector<std::vector<float>>> f0_E_curl;
-    f0_E_curl = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
-    std::vector<std::vector<std::vector<float>>> f1_E_curl;
-    f1_E_curl = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
-    std::vector<std::vector<std::vector<float>>> f2_E_curl;
-    f2_E_curl = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
+    std::vector<std::vector<std::vector<double>>> f0_E_curl;
+    f0_E_curl = std::vector<std::vector<std::vector<double>>>(100, std::vector<std::vector<double>>(100, std::vector<double>(100)));
+    std::vector<std::vector<std::vector<double>>> f1_E_curl;
+    f1_E_curl = std::vector<std::vector<std::vector<double>>>(100, std::vector<std::vector<double>>(100, std::vector<double>(100)));
+    std::vector<std::vector<std::vector<double>>> f2_E_curl;
+    f2_E_curl = std::vector<std::vector<std::vector<double>>>(100, std::vector<std::vector<double>>(100, std::vector<double>(100)));
 
-    std::vector<std::vector<std::vector<float>>> f0_H_curl;
-    f0_H_curl = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
-    std::vector<std::vector<std::vector<float>>> f1_H_curl;
-    f1_H_curl = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
-    std::vector<std::vector<std::vector<float>>> f2_H_curl;
-    f2_H_curl = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
+    std::vector<std::vector<std::vector<double>>> f0_H_curl;
+    f0_H_curl = std::vector<std::vector<std::vector<double>>>(100, std::vector<std::vector<double>>(100, std::vector<double>(100)));
+    std::vector<std::vector<std::vector<double>>> f1_H_curl;
+    f1_H_curl = std::vector<std::vector<std::vector<double>>>(100, std::vector<std::vector<double>>(100, std::vector<double>(100)));
+    std::vector<std::vector<std::vector<double>>> f2_H_curl;
+    f2_H_curl = std::vector<std::vector<std::vector<double>>>(100, std::vector<std::vector<double>>(100, std::vector<double>(100)));
 
     int source_position_x = floor(n / 3);
     int source_position_y = floor(n / 3);
@@ -167,7 +167,6 @@ int main()
         auto future_curl_f2_E = std::async (curl_f2, f0_E, f1_E);
         
         /************************* Propagation *************************/
-        //std::cout << index << " " << f0_E[source_position_x][source_position_y][source_position_z] << std::endl;
 
         auto future_f0_E = std::async(propagation_E, f0_H_curl, f0_E);
         auto future_f1_E = std::async(propagation_E, f1_H_curl, f1_E);
@@ -207,17 +206,14 @@ int main()
         //increase in time
         index++;
         
-        f0_E_curl = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
-        f1_E_curl = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
-        f2_E_curl = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
+        f0_E_curl = std::vector<std::vector<std::vector<double>>>(100, std::vector<std::vector<double>>(100, std::vector<double>(100)));
+        f1_E_curl = std::vector<std::vector<std::vector<double>>>(100, std::vector<std::vector<double>>(100, std::vector<double>(100)));
+        f2_E_curl = std::vector<std::vector<std::vector<double>>>(100, std::vector<std::vector<double>>(100, std::vector<double>(100)));
         
-        f0_H_curl = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
-        f1_H_curl = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
-        f2_H_curl = std::vector<std::vector<std::vector<float>>>(100, std::vector<std::vector<float>>(100, std::vector<float>(100)));
+        f0_H_curl = std::vector<std::vector<std::vector<double>>>(100, std::vector<std::vector<double>>(100, std::vector<double>(100)));
+        f1_H_curl = std::vector<std::vector<std::vector<double>>>(100, std::vector<std::vector<double>>(100, std::vector<double>(100)));
+        f2_H_curl = std::vector<std::vector<std::vector<double>>>(100, std::vector<std::vector<double>>(100, std::vector<double>(100)));
         std::cout << index << " > " << f0_E[source_position_x][source_position_y][source_position_z] << std::endl;
-
-        //std::cout << index << " " << f0_E[30][30][30] << std::endl;
-        //std::cout << index << " " << f0_E_curl[source_position_x][source_position_y][source_position_z] << std::endl;
     }
     
     return 0;
